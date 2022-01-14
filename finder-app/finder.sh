@@ -47,4 +47,4 @@ fi
 #If all arguments checkout then print number of files in directory and number of matching lines for string
 echo "The number of files are $(find "$1" -type f | wc -l) and the number of matching lines are $(grep -or "$2" "$1" | wc -w)"
 exit 0
-#for testing autoscr
+#for testing autos
