@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <stdio.h>
+#include <syslog.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +22,14 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success 
  *   or false() if it returned a failure
 */
+    int result = system(cmd);
 
-    return true;
+    if(result <= 0)
+        return false; // system call failed
+    else
+        return true; 
+    
+    
 }
 
 /**
@@ -58,10 +70,52 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *   
 */
+    int ret = 1; //optimization took out my return false statements
+    int result; //changing for return values in functions called below
 
+    openlog(NULL, 0, LOG_USER);
+
+    pid_t pid = fork();
+    if( pid == -1){
+        syslog(LOG_ERR, "Fork failed, child process did not launch\n\r");
+
+        ret = 0; 
+
+    } else if(!pid){
+        //printf("Command 0 is %s\n\r", command[0]);
+        result = execv(command[0], command); //pass in path and vector of args to execute process        
+        syslog(LOG_ERR, "execv call returned (failed) - child process exited with return %d\n\r", result);
+        ret = 0; 
+        exit(EXIT_FAILURE);
+
+    } else {
+        int status; 
+        result = waitpid(pid, &status, 0); 
+   
+        if(result == -1){
+            syslog(LOG_ERR, "waitpid error\n\r");
+            ret = 0; 
+        }else {
+            //taken from LSP book, page 217 (online edition)
+            syslog(LOG_DEBUG, "pid=%d\n", pid);
+
+            if (!(WIFEXITED (status))){
+                syslog(LOG_DEBUG, "Abnormal termination with exit status=%d\n", WEXITSTATUS(status));
+                ret = 0;
+            }
+
+            if (WIFSIGNALED (status))
+                syslog(LOG_DEBUG, "Killed by signal=%d%s\n", WTERMSIG(status), WCOREDUMP(status) ? " (dumped core)" : "");
+            
+            if(WEXITSTATUS (status)){
+                syslog(LOG_DEBUG, "Exit status=%d\n", WEXITSTATUS(status));
+                ret = 0;
+            }
+        }
+    }
     va_end(args);
 
-    return true;
+    return ret; 
 }
 
 /**
@@ -92,8 +146,68 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *   
 */
+    int ret = 1; //optimization took out my return false statements
+    int result; //changing for return values in functions called below
+    openlog(NULL, 0, LOG_USER);
+
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644 );
+
+    if(fd < 0){
+        syslog(LOG_ERR, "Error opening/creating outputfile\n\r");
+    }
+    
+    pid_t pid = fork();
+    if( pid == -1){
+        syslog(LOG_ERR, "Fork failed, child process did not launch\n\r");
+
+        ret = 0; 
+
+    } else if(!pid){
+        if(!(fd < 0)){
+            if((dup2(fd, 1) < 0)){
+                syslog(LOG_ERR, "dup2 failed to redirect\n\r");
+            }
+        }
+
+        close(fd);
+
+        result = execv(command[0], command); //pass in path and vector of args to execute process
+
+        syslog(LOG_ERR, "execv call returned (failed) - child process exited with return %d\n\r", result);
+
+        ret = 0;
+
+    }else {
+        int status; 
+
+        result = waitpid(pid, &status, 0); 
+   
+        if(result == -1){
+            syslog(LOG_ERR, "waitpid error\n\r");
+
+            ret = 0; 
+        }else {
+            //taken from LSP book, page 217 (online edition)
+            syslog(LOG_DEBUG, "pid=%d\n", pid);
+
+            if (!(WIFEXITED (status))){
+                syslog(LOG_DEBUG, "Abnormal termination with exit status=%d\n", WEXITSTATUS(status));
+                ret = 0;
+            }
+
+            if (WIFSIGNALED (status))
+                syslog(LOG_DEBUG, "Killed by signal=%d%s\n", WTERMSIG(status), WCOREDUMP(status) ? " (dumped core)" : "");
+            
+            if(WEXITSTATUS (status)){
+                syslog(LOG_DEBUG, "Exit status=%d\n", WEXITSTATUS(status));
+                ret = 0;
+            }
+        }
+    }
+
 
     va_end(args);
     
-    return true;
+    return ret;
 }
+    
