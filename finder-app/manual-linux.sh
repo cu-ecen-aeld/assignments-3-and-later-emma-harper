@@ -64,6 +64,7 @@ if [ -d "${OUTDIR}/rootfs" ]
 then 
     sudo rm -rf ${OUTDIR}/rootfs
 fi 
+
 echo "Creating all directories for rootfs"
 mkdir ${OUTDIR}/rootfs
 cd ${OUTDIR}/rootfs
