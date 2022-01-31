@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 		if(write_count == -1){
 			syslog(LOG_ERR,"Did not complete write\n");
 		}
-		else if(write_count != sizeof(argv[2]))
+		else if(write_count != strlen(argv[2]))
 			syslog(LOG_ERR,"Did not complete write\n");
 		else {
 			printf("Writing %s to %s\n",argv[2],argv[1]);
