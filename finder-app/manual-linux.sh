@@ -75,7 +75,6 @@ mkdir usr/bin usr/lib usr/sbin
 echo "Adding the Image in outdir"
 cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}/
 
-
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
 then
