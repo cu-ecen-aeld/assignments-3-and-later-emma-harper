@@ -1,0 +1,130 @@
+==8573== Memcheck, a memory error detector
+==8573== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==8573== Using Valgrind-3.15.0-608cb11914-20190413 and LibVEX; rerun with -h for copyright info
+==8573== Command: ./aesdsocket
+==8573== Parent PID: 8571
+==8573== 
+--8573-- 
+--8573-- Valgrind options:
+--8573--    --error-exitcode=1
+--8573--    --leak-check=full
+--8573--    --show-leak-kinds=all
+--8573--    --track-origins=yes
+--8573--    --errors-for-leak-kinds=definite
+--8573--    --verbose
+--8573--    --log-file=valgrind-out.txt
+--8573-- Contents of /proc/version:
+--8573--   Linux version 5.13.0-28-generic (buildd@lgw01-amd64-035) (gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0, GNU ld (GNU Binutils for Ubuntu) 2.34) #31~20.04.1-Ubuntu SMP Wed Jan 19 14:08:10 UTC 2022
+--8573-- 
+--8573-- Arch and hwcaps: AMD64, LittleEndian, amd64-cx16-lzcnt-rdtscp-sse3-ssse3-avx-avx2-rdrand
+--8573-- Page sizes: currently 4096, max supported 4096
+--8573-- Valgrind library directory: /usr/lib/x86_64-linux-gnu/valgrind
+--8573-- Reading syms from /home/emmaharper/Documents/AESD/assignment-3-emma-harper/server/aesdsocket
+--8573-- Reading syms from /usr/lib/x86_64-linux-gnu/ld-2.31.so
+--8573--   Considering /usr/lib/x86_64-linux-gnu/ld-2.31.so ..
+--8573--   .. CRC mismatch (computed 975d0390 wanted 30bd717f)
+--8573--   Considering /lib/x86_64-linux-gnu/ld-2.31.so ..
+--8573--   .. CRC mismatch (computed 975d0390 wanted 30bd717f)
+--8573--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.31.so ..
+--8573--   .. CRC is valid
+--8573-- Reading syms from /usr/lib/x86_64-linux-gnu/valgrind/memcheck-amd64-linux
+--8573--    object doesn't have a symbol table
+--8573--    object doesn't have a dynamic symbol table
+--8573-- Scheduler: using generic scheduler lock implementation.
+--8573-- Reading suppressions file: /usr/lib/x86_64-linux-gnu/valgrind/default.supp
+==8573== embedded gdbserver: reading from /tmp/vgdb-pipe-from-vgdb-to-8573-by-emmaharper-on-???
+==8573== embedded gdbserver: writing to   /tmp/vgdb-pipe-to-vgdb-from-8573-by-emmaharper-on-???
+==8573== embedded gdbserver: shared mem   /tmp/vgdb-pipe-shared-mem-vgdb-8573-by-emmaharper-on-???
+==8573== 
+==8573== TO CONTROL THIS PROCESS USING vgdb (which you probably
+==8573== don't want to do, unless you know exactly what you're doing,
+==8573== or are doing some strange experiment):
+==8573==   /usr/lib/x86_64-linux-gnu/valgrind/../../bin/vgdb --pid=8573 ...command...
+==8573== 
+==8573== TO DEBUG THIS PROCESS USING GDB: start GDB like this
+==8573==   /path/to/gdb ./aesdsocket
+==8573== and then give GDB the following command
+==8573==   target remote | /usr/lib/x86_64-linux-gnu/valgrind/../../bin/vgdb --pid=8573
+==8573== --pid is optional if only one valgrind process is running
+==8573== 
+--8573-- REDIR: 0x4022e10 (ld-linux-x86-64.so.2:strlen) redirected to 0x580c9ce2 (???)
+--8573-- REDIR: 0x4022be0 (ld-linux-x86-64.so.2:index) redirected to 0x580c9cfc (???)
+--8573-- Reading syms from /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_core-amd64-linux.so
+--8573--    object doesn't have a symbol table
+--8573-- Reading syms from /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so
+--8573--    object doesn't have a symbol table
+==8573== WARNING: new redirection conflicts with existing -- ignoring it
+--8573--     old: 0x04022e10 (strlen              ) R-> (0000.0) 0x580c9ce2 ???
+--8573--     new: 0x04022e10 (strlen              ) R-> (2007.0) 0x0483f060 strlen
+--8573-- REDIR: 0x401f5f0 (ld-linux-x86-64.so.2:strcmp) redirected to 0x483ffd0 (strcmp)
+--8573-- REDIR: 0x4023370 (ld-linux-x86-64.so.2:mempcpy) redirected to 0x4843a20 (mempcpy)
+==8573== 
+==8573== Process terminating with default action of signal 15 (SIGTERM)
+==8573==    at 0x401EF56: __open_nocancel (open64_nocancel.c:45)
+==8573==    by 0x40083BA: open_verify.constprop.0 (dl-load.c:1536)
+==8573==    by 0x4008C15: open_path (dl-load.c:1827)
+==8573==    by 0x400A7A2: _dl_map_object (dl-load.c:2067)
+==8573==    by 0x400F504: openaux (dl-deps.c:64)
+==8573==    by 0x401DCA9: _dl_catch_exception (dl-error-skeleton.c:208)
+==8573==    by 0x400F952: _dl_map_object_deps (dl-deps.c:248)
+==8573==    by 0x4004063: dl_main (rtld.c:1805)
+==8573==    by 0x401CC3A: _dl_sysdep_start (dl-sysdep.c:252)
+==8573==    by 0x400204B: _dl_start_final (rtld.c:449)
+==8573==    by 0x400204B: _dl_start (rtld.c:539)
+==8573==    by 0x4001107: ??? (in /usr/lib/x86_64-linux-gnu/ld-2.31.so)
+==8573== Jump to the invalid address stated on the next line
+==8573==    at 0x1030: ???
+==8573==    by 0x40083BA: open_verify.constprop.0 (dl-load.c:1536)
+==8573==    by 0x4008C15: open_path (dl-load.c:1827)
+==8573==    by 0x400A7A2: _dl_map_object (dl-load.c:2067)
+==8573==    by 0x400F504: openaux (dl-deps.c:64)
+==8573==    by 0x401DCA9: _dl_catch_exception (dl-error-skeleton.c:208)
+==8573==    by 0x400F952: _dl_map_object_deps (dl-deps.c:248)
+==8573==    by 0x4004063: dl_main (rtld.c:1805)
+==8573==    by 0x401CC3A: _dl_sysdep_start (dl-sysdep.c:252)
+==8573==    by 0x400204B: _dl_start_final (rtld.c:449)
+==8573==    by 0x400204B: _dl_start (rtld.c:539)
+==8573==    by 0x4001107: ??? (in /usr/lib/x86_64-linux-gnu/ld-2.31.so)
+==8573==  Address 0x1030 is not stack'd, malloc'd or (recently) free'd
+==8573== 
+==8573== 
+==8573== Process terminating with default action of signal 11 (SIGSEGV)
+==8573==  Bad permissions for mapped region at address 0x1030
+==8573==    at 0x1030: ???
+==8573==    by 0x40083BA: open_verify.constprop.0 (dl-load.c:1536)
+==8573==    by 0x4008C15: open_path (dl-load.c:1827)
+==8573==    by 0x400A7A2: _dl_map_object (dl-load.c:2067)
+==8573==    by 0x400F504: openaux (dl-deps.c:64)
+==8573==    by 0x401DCA9: _dl_catch_exception (dl-error-skeleton.c:208)
+==8573==    by 0x400F952: _dl_map_object_deps (dl-deps.c:248)
+==8573==    by 0x4004063: dl_main (rtld.c:1805)
+==8573==    by 0x401CC3A: _dl_sysdep_start (dl-sysdep.c:252)
+==8573==    by 0x400204B: _dl_start_final (rtld.c:449)
+==8573==    by 0x400204B: _dl_start (rtld.c:539)
+==8573==    by 0x4001107: ??? (in /usr/lib/x86_64-linux-gnu/ld-2.31.so)
+==8573== 
+==8573== HEAP SUMMARY:
+==8573==     in use at exit: 0 bytes in 0 blocks
+==8573==   total heap usage: 0 allocs, 0 frees, 0 bytes allocated
+==8573== 
+==8573== All heap blocks were freed -- no leaks are possible
+==8573== 
+==8573== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+==8573== 
+==8573== 1 errors in context 1 of 1:
+==8573== Jump to the invalid address stated on the next line
+==8573==    at 0x1030: ???
+==8573==    by 0x40083BA: open_verify.constprop.0 (dl-load.c:1536)
+==8573==    by 0x4008C15: open_path (dl-load.c:1827)
+==8573==    by 0x400A7A2: _dl_map_object (dl-load.c:2067)
+==8573==    by 0x400F504: openaux (dl-deps.c:64)
+==8573==    by 0x401DCA9: _dl_catch_exception (dl-error-skeleton.c:208)
+==8573==    by 0x400F952: _dl_map_object_deps (dl-deps.c:248)
+==8573==    by 0x4004063: dl_main (rtld.c:1805)
+==8573==    by 0x401CC3A: _dl_sysdep_start (dl-sysdep.c:252)
+==8573==    by 0x400204B: _dl_start_final (rtld.c:449)
+==8573==    by 0x400204B: _dl_start (rtld.c:539)
+==8573==    by 0x4001107: ??? (in /usr/lib/x86_64-linux-gnu/ld-2.31.so)
+==8573==  Address 0x1030 is not stack'd, malloc'd or (recently) free'd
+==8573== 
+==8573== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
