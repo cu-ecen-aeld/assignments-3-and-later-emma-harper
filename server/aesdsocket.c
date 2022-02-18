@@ -34,6 +34,7 @@ static struct addrinfo  *new_addr_info;
 
 
 void shutdown_process(){
+
     if(client_fd > -1){
         close(client_fd);
     }
@@ -45,6 +46,7 @@ void shutdown_process(){
         close(server_fd);
     }
 
+    unlink(DATA_FILE);
   // check if file exists and if so, delete it
     if (access(DATA_FILE, F_OK) == 0)  {
        remove(DATA_FILE);
@@ -56,7 +58,7 @@ void shutdown_process(){
 
 static void sig_handler(int sig){
     syslog(LOG_INFO, "Signal Caught %d\n\r", sig);
-    printf("signal caughtt\n");
+    //printf("signal caughtt\n");
     shutdown_process();
     exit(0);
 
@@ -200,14 +202,14 @@ int main(int argc, char **argv) {
         int curr_pos = 0;
 
         while(1){
-            int read_bytes = read(client_fd, &buf[curr_pos], (BUF_SIZE - curr_pos));
+            int read_bytes = read(client_fd, buf, (BUF_SIZE));
             if (read_bytes < 0) {
                 syslog(LOG_ERR, "Error: reading from socket errno=%d\n", errno);
                 curr_pos = 0; //re read
                 continue; 
             }
             if (read_bytes == 0)
-                break; // no bytes to read
+                continue; // no bytes to read
 
             printf("read %d bytes\n\r", read_bytes);
             //get file opened for writing
@@ -281,7 +283,7 @@ int main(int argc, char **argv) {
             }
 
 
-            if((curr_pos + write_bytes) == read_bytes){
+            if((write_bytes) == read_bytes){
                 curr_pos = 0;
 
             } else{
