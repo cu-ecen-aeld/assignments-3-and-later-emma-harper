@@ -36,6 +36,7 @@ static struct addrinfo  *new_addr_info;
 void shutdown_process(){
 
     if(client_fd > -1){
+        shutdown(client_fd, SHUT_RDWR);// secondly, terminate the 'reliable' delivery
         close(client_fd);
     }
 
@@ -43,6 +44,8 @@ void shutdown_process(){
         freeaddrinfo(new_addr_info);
 
     if(server_fd > -1){
+        shutdown(server_fd, SHUT_RDWR); // secondly, terminate the 'reliable' delivery
+
         close(server_fd);
     }
 
