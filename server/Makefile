@@ -1,15 +1,28 @@
-CC = $(CROSS_COMPILE)gcc
-CFLAGS = -g -Wall -Werror
-SRCS := aesdsocket.c 
-TARGET = aesdsocket
-OBJS := $(SRC:.c=.o)
+CC=$(CROSS_COMPILE)gcc
+CFLAGS= -g -Wall -Werror -pthread
 
-all: $(TARGET)
+LDFLAGS= -lpthread -lrt	
 
-writer: 
-	$(CC) $(CFLAGS) -c $(SRCS) -o $(TARGET).o 
-	$(CC) $(CFLAGS) $(TARGET).o -o $(TARGET)
+TARGET=aesdsocket
 
+HFILES= queue.h
+CFILES= aesdsocket.c
+
+SRCS= ${CFILES}
+OBJS= ${CFILES:.c=.o}
+
+all:	${TARGET}
+
+default: ${TARGET}
 
 clean:
-	-rm -f *.o $(TARGET)
+	-rm -f *.o *.NEW *~ *.d
+	-rm -f ${TARGET} 
+
+aesdsocket:	aesdsocket.o
+	$(CC) $(CFLAGS) -o $@ aesdsocket.o $(LDFLAGS)
+
+depend:
+
+.c.o:
+	$(CC) -MD $(CFLAGS) -c $<
