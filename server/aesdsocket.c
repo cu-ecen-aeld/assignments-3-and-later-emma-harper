@@ -345,7 +345,6 @@ int main(int argc, char **argv) {
     if (bind(server_fd, new_addr_info->ai_addr, new_addr_info->ai_addrlen) < 0) {
         syslog(LOG_ERR, "ERROR binding socket error num %d\n", errno);
         freeaddrinfo(new_addr_info);
-
         shutdown_process();
         exit(1);
     }
@@ -460,16 +459,20 @@ int main(int argc, char **argv) {
 
     }
 
+    pthread_join(time_id, NULL);
+
     //Kill all threads
     while (!SLIST_EMPTY(&head)) {
-        syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
-        pthread_cancel(data_ptr->thread_params.thread_id);
+        //pthread_cancel(data_ptr->thread_params.thread_id);
         data_ptr = SLIST_FIRST(&head);
-
-        SLIST_REMOVE(&head, data_ptr, slist_data_s, entries); // Remove from link list
-        free(data_ptr);                                           // Free allocate memory
+        syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
+        SLIST_REMOVE_HEAD(&head, entries);
+        free(data_ptr); 
+        data_ptr = NULL;// Free allocate memory
     }
-    pthread_join(time_id, NULL);
+
+    printf("HERERERER\n\r");
+    
     //close(data_fd);
     unlink(DATA_FILE);
     if (access(DATA_FILE, F_OK) == 0)  {
