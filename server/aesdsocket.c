@@ -96,102 +96,176 @@ static void sig_handler(int sig){
 
 }
 
-static inline void timespec_add( struct timespec *result,
-                        const struct timespec *ts_1, const struct timespec *ts_2)
-{
-    result->tv_sec = ts_1->tv_sec + ts_2->tv_sec;
-    result->tv_nsec = ts_1->tv_nsec + ts_2->tv_nsec;
-    if( result->tv_nsec > 1000000000L ) {
-        result->tv_nsec -= 1000000000L;
-        result->tv_sec ++;
-    }
-}
+// static inline void timespec_add( struct timespec *result,
+//                         const struct timespec *ts_1, const struct timespec *ts_2)
+// {
+//     result->tv_sec = ts_1->tv_sec + ts_2->tv_sec;
+//     result->tv_nsec = ts_1->tv_nsec + ts_2->tv_nsec;
+//     if( result->tv_nsec > 1000000000L ) {
+//         result->tv_nsec -= 1000000000L;
+//         result->tv_sec ++;
+//     }
+// }
 
-static void timer_thread(union sigval sigval)
-{
-    //int *fd = (int*) sigval.sival_ptr;
-    struct tm *time_tm;
+// static void timer_thread(union sigval sigval)
+// {
+//     //int *fd = (int*) sigval.sival_ptr;
+//     struct tm *time_tm;
 
-    char format[100];
+//     char format[100];
 
-    time_t time_stamp;
-    time(&time_stamp);
+//     time_t time_stamp;
+//     time(&time_stamp);
     
-    time_tm = localtime(&time_stamp);
+//     time_tm = localtime(&time_stamp);
 
-    memcpy(format, "",100);
+//     memcpy(format, "",100);
 
-    size_t time_size = strftime(format,100,"timestamp: %a, %d %b %Y %T %z\n", time_tm);
+//     size_t time_size = strftime(format,100,"timestamp: %a, %d %b %Y %T %z\n", time_tm);
 
+
+//     // //get file opened for writing
+//     int fd = open(DATA_FILE,O_RDWR | O_APPEND, 0766);
+//     if (fd < 0)
+//         syslog(LOG_ERR, "error opening file errno is %d\n\r", errno);
+
+//     int ret = pthread_mutex_lock(&mutex_lock);
+//     if(ret){
+//         close(fd);
+//         return;
+//     }
+//     lseek(fd, 0, SEEK_END); //need to append to end of file
+
+//     int write_bytes = write(fd, format, time_size);
+//     syslog( LOG_INFO, "Timestamp %s written to file\n", format);
+//     printf("Timestamp %s written to file\n", format);
+
+//     if (write_bytes < 0){
+//         syslog(LOG_ERR, "Write of timestamp failed errno %d",errno);
+//         printf("Cannot write timestamp to file\n\r");
+//     }
+    
+//     ret = pthread_mutex_unlock(&mutex_lock);
+//     if(ret){
+//         close(fd);
+//         return;
+//     }
+//     close(fd);
+// }
+
+static uint32_t TIMER_INTERVAL_SEC = 10;
+
+void *handle_timer(void *args)
+{
+  //int *filefd = (int *)args;
+  size_t len;
+  time_t ts;
+  struct tm *localTime;
+  struct timespec currTime = {0, 0};
+  int count = TIMER_INTERVAL_SEC;
+
+  while (!sig_caught)
+  {
+    // Get current time
+    if (clock_gettime(CLOCK_MONOTONIC, &currTime), 0)
+    {
+      //log_message(LOG_ERR, "Error: could get monotonic time, [%s]\n", strerror(errno));
+      continue;
+    }
+
+    if ((--count) <= 0)
+    {
+        char buf[100] = {0};
+        time(&ts);         // Get the timestamp
+        localTime = localtime(&ts); // Convert to local time
+        len = strftime(buf, 100, "timestamp:%a, %d %b %Y %T %z\n", localTime);
+
+        //log_message(LOG_DEBUG, "%s", buf);
 
     // //get file opened for writing
-    int fd = open(DATA_FILE,O_RDWR | O_APPEND, 0766);
-    if (fd < 0)
-        syslog(LOG_ERR, "error opening file errno is %d\n\r", errno);
+        int fd = open(DATA_FILE,O_RDWR | O_APPEND, 0766);
+        if (fd < 0)
+            syslog(LOG_ERR, "error opening file errno is %d\n\r", errno);
 
-    int ret = pthread_mutex_lock(&mutex_lock);
-    if(ret){
+        int ret = pthread_mutex_lock(&mutex_lock);
+        if(ret){
+            syslog(LOG_ERR, "Could not lock mutex\n\r");
+            close(fd);
+        }
+        lseek(fd, 0, SEEK_END); //need to append to end of file
+
+        int write_bytes = write(fd, buf, len);
+        syslog( LOG_INFO, "Timestamp %s written to file\n", buf);
+        printf("Timestamp %s written to file\n", buf);
+
+        if (write_bytes < 0){
+            syslog(LOG_ERR, "Write of timestamp failed errno %d",errno);
+            printf("Cannot write timestamp to file\n\r");
+        }
+        
+        ret = pthread_mutex_unlock(&mutex_lock);
+        if(ret){
+            syslog(LOG_ERR, "Could not unlock mutex\n\r");
+            close(fd);
+        }
         close(fd);
-        return;
+        count = TIMER_INTERVAL_SEC;
     }
-    lseek(fd, 0, SEEK_END); //need to append to end of file
 
-    int write_bytes = write(fd, format, time_size);
-    syslog( LOG_INFO, "Timestamp %s written to file\n", format);
-    printf("Timestamp %s written to file\n", format);
+    currTime.tv_sec += 1; 
+    currTime.tv_nsec += 1000000;
+    if (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &currTime, NULL) != 0)
+    {
+      // The sleep was interrupted by a signal handler; see signal(7).
+      if (errno == EINTR)
+        break; // Exit thread
 
-    if (write_bytes < 0){
-        syslog(LOG_ERR, "Write of timestamp failed errno %d",errno);
-        printf("Cannot write timestamp to file\n\r");
-    }
-    
-    ret = pthread_mutex_unlock(&mutex_lock);
-    if(ret){
-        close(fd);
-        return;
-    }
-    close(fd);
+      //log_message(LOG_ERR, "Error: could not sleep, [%s]\n", strerror(errno));
+    }     
+  }
+
+  //log_message(LOG_INFO, "<<< Timer thread done >>>\n");
+  pthread_exit(NULL);
 }
 
+// static void init_timer(timer_t* timer_id){
 
-static void init_timer(timer_t* timer_id){
+//     struct sigevent sig;
+//     memset(&sig, 0, sizeof(struct sigevent));
 
-    struct sigevent sig;
-    memset(&sig, 0, sizeof(struct sigevent));
+//     sig.sigev_notify = SIGEV_THREAD;
+//     //sig.sigev_value.sival_ptr = fd;
+//     sig.sigev_notify_function = timer_thread;
 
-    sig.sigev_notify = SIGEV_THREAD;
-    //sig.sigev_value.sival_ptr = fd;
-    sig.sigev_notify_function = timer_thread;
+//     int res = timer_create(CLOCK_MONOTONIC, &sig, timer_id);
+//     if(res){
+//         syslog(LOG_ERR, "ERROR - creating timer failed\n\r");
+//         return;
+//     }
 
-    int res = timer_create(CLOCK_MONOTONIC, &sig, timer_id);
-    if(res){
-        syslog(LOG_ERR, "ERROR - creating timer failed\n\r");
-        return;
-    }
+//     struct timespec start_time = {0};
 
-    struct timespec start_time = {0};
+//     res = clock_gettime(CLOCK_MONOTONIC, &start_time);
+//     if(res){
+//         syslog(LOG_ERR, "Error getting clock time errno %d\n\r", errno);
+//         return;
+//     }
 
-    res = clock_gettime(CLOCK_MONOTONIC, &start_time);
-    if(res){
-        syslog(LOG_ERR, "Error getting clock time errno %d\n\r", errno);
-        return;
-    }
+//     struct itimerspec itimer;
+//     itimer.it_interval.tv_sec = 10;
+//     itimer.it_interval.tv_nsec = 1000000; //check this
 
-    struct itimerspec itimer;
-    itimer.it_interval.tv_sec = 10;
-    itimer.it_interval.tv_nsec = 1000000; //check this
+//     timespec_add(&itimer.it_value, &start_time, &itimer.it_interval);
 
-    timespec_add(&itimer.it_value, &start_time, &itimer.it_interval);
+//     res = timer_settime(*timer_id, TIMER_ABSTIME, &itimer, NULL);
+//     if(res){
+//         syslog(LOG_ERR, "error seting time back to start time %d\n\r", errno);
+//         return;
+//     }
 
-    res = timer_settime(*timer_id, TIMER_ABSTIME, &itimer, NULL);
-    if(res){
-        syslog(LOG_ERR, "error seting time back to start time %d\n\r", errno);
-        return;
-    }
+//     return;
 
-    return;
-
-}
+// }
 
 
 int main(int argc, char **argv) {
@@ -202,14 +276,14 @@ int main(int argc, char **argv) {
     if (res == SIG_ERR) {
         syslog(LOG_ERR, "ERROR: could not register SIGINT, error SIG_ERR\n\r");
         shutdown_process();
-        return -1;
+        exit(1);
     }
 
     res = signal(SIGTERM, sig_handler);
     if (res == SIG_ERR) {
         syslog(LOG_ERR, "ERROR: could not register SIGTERM, error SIG_ERR\n\r");
         shutdown_process();
-        return -1;
+        exit(1);
     }
 
     bool daemonize = false;
@@ -221,7 +295,7 @@ int main(int argc, char **argv) {
             printf("Useage incorrect for arg: %s\nUse -d option for daemonize", argv[1]);
             syslog(LOG_ERR, "Useage incorrect for arg: %s\nUse -d option for daemonize", argv[1]);
 
-             return (-1);
+             exit(1);
         }
     }
     //open or create file
@@ -229,7 +303,7 @@ int main(int argc, char **argv) {
     if(write_fd < 0){
         syslog(LOG_ERR, "ERROR: aesdsocketdata file could not be opened/created, error number %d", errno);
         shutdown_process();
-        return -1;
+        exit(1);
     }
     close(write_fd);
   
@@ -249,7 +323,7 @@ int main(int argc, char **argv) {
     if (result != 0) {
         syslog(LOG_ERR, "ERROR in getaddrinfo() %s\n", gai_strerror(result));
         shutdown_process();
-        exit(-1);
+        exit(1);
     }
 
     // Open socket connection
@@ -257,21 +331,21 @@ int main(int argc, char **argv) {
     if (server_fd < 0) {
         syslog(LOG_ERR, "ERROR opening socket, error number %d\n", errno);
         shutdown_process();
-        exit(-1);
+        exit(1);
     }
 
    // Set sockopts for reuse of server socket
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
         syslog(LOG_ERR, "ERROR set socket options failed with error number%d\n", errno);
         shutdown_process();
-        exit(-1);
+        exit(1);
     }
 
     // Bind device address to socket
     if (bind(server_fd, new_addr_info->ai_addr, new_addr_info->ai_addrlen) < 0) {
         syslog(LOG_ERR, "ERROR binding socket error num %d\n", errno);
         shutdown_process();
-        exit(-1);
+        exit(1);
     }
 
 
@@ -279,7 +353,7 @@ int main(int argc, char **argv) {
     if (listen(server_fd, MAX_NUM_CONNECTIONS)) {
         syslog(LOG_ERR, "ERROR: listening for connection error num %d\n", errno);
         shutdown_process();
-        exit(-1);
+        exit(1);
     }
 
     printf("Listening for connections\n\r");
@@ -293,7 +367,7 @@ int main(int argc, char **argv) {
         pid_t pid = fork();
         if (pid < 0) {
           shutdown_process();
-          exit(-1);
+          exit(1);
         }
         if (pid > 0) {
             exit(EXIT_SUCCESS); 
@@ -302,7 +376,7 @@ int main(int argc, char **argv) {
         // create new session
         if (setsid() == -1) {
             syslog(LOG_ERR, "setsid error%d\n", errno);
-            exit(-1);
+            exit(1);
         }
         // change dir to root dir
         chdir("/");
@@ -315,10 +389,12 @@ int main(int argc, char **argv) {
         close(devnull);
     }
 
-    timer_t timer_id;
+    //timer_t timer_id;
 
-    init_timer(&timer_id);
-
+     //   init_timer(&timer_id);
+    int dummy_var = 1; 
+    pthread_t time_id; 
+    pthread_create(&time_id, NULL, handle_timer, (void*)&dummy_var);
 
     while(!(sig_caught)) {
 
@@ -329,7 +405,7 @@ int main(int argc, char **argv) {
         if(client_fd < 0){
             syslog(LOG_ERR, "ERROR: accepting new connection error is %s", strerror(errno));
             shutdown_process();
-            exit(-1);
+            exit(1);
         }
 
         
@@ -369,13 +445,14 @@ int main(int argc, char **argv) {
     //Kill all threads
     SLIST_FOREACH(data_ptr, &head, entries)
     {
-        if (data_ptr->thread_params.done_flag == true) {
-            syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
-            pthread_cancel(data_ptr->thread_params.thread_id);
-        }
+        syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
+        pthread_cancel(data_ptr->thread_params.thread_id);
+        data_ptr = SLIST_FIRST(&head);
+
         SLIST_REMOVE(&head, data_ptr, slist_data_s, entries); // Remove from link list
         free(data_ptr);                                           // Free allocate memory
     }
+    pthread_join(time_id, NULL);
     //close(data_fd);
     unlink(DATA_FILE);
     if (access(DATA_FILE, F_OK) == 0)  {
@@ -411,7 +488,9 @@ void* run_socket_comm(void* thr_params){
         int read_bytes = read(params->client_fd, buf, (BUF_SIZE));
         if (read_bytes < 0) {
             syslog(LOG_ERR, "Error: reading from socket errno=%d\n", errno);
-            exit(1); 
+            free(thread_buf);
+            params->done_flag = true;
+            pthread_exit(NULL);
         }
 
         printf("read %d bytes\n\r", read_bytes);
@@ -423,7 +502,9 @@ void* run_socket_comm(void* thr_params){
             thread_buf = (char*)realloc(thread_buf, sizeof(char) * (curr_pos + BUF_SIZE));
             if(thread_buf == NULL){
                 syslog(LOG_ERR,"Error allocating buffer for thread %d\n\r", (int)params->thread_id);
+                free(thread_buf);
                 params->done_flag = true; //exit
+                pthread_exit(NULL);
             }
 
             buf_space += curr_pos;
