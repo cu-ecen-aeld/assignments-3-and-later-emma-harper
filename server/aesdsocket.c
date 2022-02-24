@@ -25,6 +25,7 @@
 #include <sys/queue.h>
 #include <time.h>
 #include <sys/time.h>
+#include <poll.h>
 
 #define DATA_FILE "/var/tmp/aesdsocketdata"
 #define MAX_NUM_CONNECTIONS 10
@@ -66,9 +67,6 @@ void shutdown_process(){
     //     close(client_fd);
     // }
 
-    if(new_addr_info != NULL)
-        freeaddrinfo(new_addr_info);
-
     if(server_fd > -1){
         shutdown(server_fd, SHUT_RDWR); // secondly, terminate the 'reliable' delivery
 
@@ -90,10 +88,9 @@ static void sig_handler(int sig){
     syslog(LOG_INFO, "Signal Caught %d\n\r", sig);
     //printf("signal caughtt\n");
     sig_caught = true;
-    sleep(1);
-    shutdown_process();
-    exit(0);
-
+    //sleep(1);
+    //shutdown_process();
+\
 }
 
 // static inline void timespec_add( struct timespec *result,
@@ -322,6 +319,7 @@ int main(int argc, char **argv) {
     int result = getaddrinfo(NULL, (PORT_NUM), &addr_hints, &new_addr_info);
     if (result != 0) {
         syslog(LOG_ERR, "ERROR in getaddrinfo() %s\n", gai_strerror(result));
+        freeaddrinfo(new_addr_info);
         shutdown_process();
         exit(1);
     }
@@ -330,6 +328,7 @@ int main(int argc, char **argv) {
     server_fd = socket(new_addr_info->ai_family, SOCK_STREAM, 0);
     if (server_fd < 0) {
         syslog(LOG_ERR, "ERROR opening socket, error number %d\n", errno);
+        freeaddrinfo(new_addr_info);
         shutdown_process();
         exit(1);
     }
@@ -337,6 +336,7 @@ int main(int argc, char **argv) {
    // Set sockopts for reuse of server socket
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
         syslog(LOG_ERR, "ERROR set socket options failed with error number%d\n", errno);
+        freeaddrinfo(new_addr_info);
         shutdown_process();
         exit(1);
     }
@@ -344,11 +344,14 @@ int main(int argc, char **argv) {
     // Bind device address to socket
     if (bind(server_fd, new_addr_info->ai_addr, new_addr_info->ai_addrlen) < 0) {
         syslog(LOG_ERR, "ERROR binding socket error num %d\n", errno);
+        freeaddrinfo(new_addr_info);
+
         shutdown_process();
         exit(1);
     }
 
-
+    freeaddrinfo(new_addr_info);
+    
     // Listen for connection
     if (listen(server_fd, MAX_NUM_CONNECTIONS)) {
         syslog(LOG_ERR, "ERROR: listening for connection error num %d\n", errno);
@@ -396,17 +399,32 @@ int main(int argc, char **argv) {
     pthread_t time_id; 
     pthread_create(&time_id, NULL, handle_timer, (void*)&dummy_var);
 
+    struct pollfd poll_socket[1];
+    poll_socket[0].fd = server_fd;
+    poll_socket[0].events = POLLIN;
+    int poll_time_ms = 100;
+
     while(!(sig_caught)) {
 
         struct sockaddr_in client_addr;
         socklen_t client_addr_size = sizeof(client_addr);
 
+        poll(poll_socket, 1, poll_time_ms);
+        if (poll_socket[0].revents != POLLIN)
+            continue;
+
         int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_addr_size);
+
+        if(sig_caught)
+            break;
+
         if(client_fd < 0){
             syslog(LOG_ERR, "ERROR: accepting new connection error is %s", strerror(errno));
             shutdown_process();
             exit(1);
         }
+
+
 
         
         char client_info[INET_ADDRSTRLEN];
@@ -443,8 +461,7 @@ int main(int argc, char **argv) {
     }
 
     //Kill all threads
-    SLIST_FOREACH(data_ptr, &head, entries)
-    {
+    while (!SLIST_EMPTY(&head)) {
         syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
         pthread_cancel(data_ptr->thread_params.thread_id);
         data_ptr = SLIST_FIRST(&head);
