@@ -62,11 +62,6 @@ typedef struct slist_data_s slist_data_t;
 
 void shutdown_process(){
 
-    // if(client_fd > -1){
-    //     shutdown(client_fd, SHUT_RDWR);// secondly, terminate the 'reliable' delivery
-    //     close(client_fd);
-    // }
-
     if(server_fd > -1){
         shutdown(server_fd, SHUT_RDWR); // secondly, terminate the 'reliable' delivery
 
@@ -74,11 +69,6 @@ void shutdown_process(){
     }
 
     pthread_mutex_destroy(&mutex_lock);
-   // unlink(DATA_FILE);
-  // check if file exists and if so, delete it
-    // if (access(DATA_FILE, F_OK) == 0)  {
-    //    remove(DATA_FILE);
-    // }
 
     closelog();
 
@@ -86,75 +76,16 @@ void shutdown_process(){
 
 static void sig_handler(int sig){
     syslog(LOG_INFO, "Signal Caught %d\n\r", sig);
-    //printf("signal caughtt\n");
     sig_caught = true;
-    //sleep(1);
-    //shutdown_process();
-\
+
 }
 
-// static inline void timespec_add( struct timespec *result,
-//                         const struct timespec *ts_1, const struct timespec *ts_2)
-// {
-//     result->tv_sec = ts_1->tv_sec + ts_2->tv_sec;
-//     result->tv_nsec = ts_1->tv_nsec + ts_2->tv_nsec;
-//     if( result->tv_nsec > 1000000000L ) {
-//         result->tv_nsec -= 1000000000L;
-//         result->tv_sec ++;
-//     }
-// }
-
-// static void timer_thread(union sigval sigval)
-// {
-//     //int *fd = (int*) sigval.sival_ptr;
-//     struct tm *time_tm;
-
-//     char format[100];
-
-//     time_t time_stamp;
-//     time(&time_stamp);
-    
-//     time_tm = localtime(&time_stamp);
-
-//     memcpy(format, "",100);
-
-//     size_t time_size = strftime(format,100,"timestamp: %a, %d %b %Y %T %z\n", time_tm);
-
-
-//     // //get file opened for writing
-//     int fd = open(DATA_FILE,O_RDWR | O_APPEND, 0766);
-//     if (fd < 0)
-//         syslog(LOG_ERR, "error opening file errno is %d\n\r", errno);
-
-//     int ret = pthread_mutex_lock(&mutex_lock);
-//     if(ret){
-//         close(fd);
-//         return;
-//     }
-//     lseek(fd, 0, SEEK_END); //need to append to end of file
-
-//     int write_bytes = write(fd, format, time_size);
-//     syslog( LOG_INFO, "Timestamp %s written to file\n", format);
-//     printf("Timestamp %s written to file\n", format);
-
-//     if (write_bytes < 0){
-//         syslog(LOG_ERR, "Write of timestamp failed errno %d",errno);
-//         printf("Cannot write timestamp to file\n\r");
-//     }
-    
-//     ret = pthread_mutex_unlock(&mutex_lock);
-//     if(ret){
-//         close(fd);
-//         return;
-//     }
-//     close(fd);
-// }
 
 static uint32_t TIMER_INTERVAL_SEC = 10;
 
 void *handle_timer(void *args)
 {
-  //int *filefd = (int *)args;
+
   size_t len;
   time_t ts;
   struct tm *localTime;
@@ -166,7 +97,7 @@ void *handle_timer(void *args)
     // Get current time
     if (clock_gettime(CLOCK_MONOTONIC, &currTime), 0)
     {
-      //log_message(LOG_ERR, "Error: could get monotonic time, [%s]\n", strerror(errno));
+      syslog(LOG_ERR, "Error: could get monotonic time, [%s]\n", strerror(errno));
       continue;
     }
 
@@ -176,8 +107,6 @@ void *handle_timer(void *args)
         time(&ts);         // Get the timestamp
         localTime = localtime(&ts); // Convert to local time
         len = strftime(buf, 100, "timestamp:%a, %d %b %Y %T %z\n", localTime);
-
-        //log_message(LOG_DEBUG, "%s", buf);
 
     // //get file opened for writing
         int fd = open(DATA_FILE,O_RDWR | O_APPEND, 0766);
@@ -217,52 +146,12 @@ void *handle_timer(void *args)
       if (errno == EINTR)
         break; // Exit thread
 
-      //log_message(LOG_ERR, "Error: could not sleep, [%s]\n", strerror(errno));
     }     
   }
 
-  //log_message(LOG_INFO, "<<< Timer thread done >>>\n");
   pthread_exit(NULL);
 }
 
-// static void init_timer(timer_t* timer_id){
-
-//     struct sigevent sig;
-//     memset(&sig, 0, sizeof(struct sigevent));
-
-//     sig.sigev_notify = SIGEV_THREAD;
-//     //sig.sigev_value.sival_ptr = fd;
-//     sig.sigev_notify_function = timer_thread;
-
-//     int res = timer_create(CLOCK_MONOTONIC, &sig, timer_id);
-//     if(res){
-//         syslog(LOG_ERR, "ERROR - creating timer failed\n\r");
-//         return;
-//     }
-
-//     struct timespec start_time = {0};
-
-//     res = clock_gettime(CLOCK_MONOTONIC, &start_time);
-//     if(res){
-//         syslog(LOG_ERR, "Error getting clock time errno %d\n\r", errno);
-//         return;
-//     }
-
-//     struct itimerspec itimer;
-//     itimer.it_interval.tv_sec = 10;
-//     itimer.it_interval.tv_nsec = 1000000; //check this
-
-//     timespec_add(&itimer.it_value, &start_time, &itimer.it_interval);
-
-//     res = timer_settime(*timer_id, TIMER_ABSTIME, &itimer, NULL);
-//     if(res){
-//         syslog(LOG_ERR, "error seting time back to start time %d\n\r", errno);
-//         return;
-//     }
-
-//     return;
-
-// }
 
 
 int main(int argc, char **argv) {
@@ -463,8 +352,9 @@ int main(int argc, char **argv) {
 
     //Kill all threads
     while (!SLIST_EMPTY(&head)) {
-        //pthread_cancel(data_ptr->thread_params.thread_id);
         data_ptr = SLIST_FIRST(&head);
+        pthread_cancel(data_ptr->thread_params.thread_id);
+
         syslog(LOG_INFO, "Killing thread %d\n\r", (int) data_ptr->thread_params.thread_id);
         SLIST_REMOVE_HEAD(&head, entries);
         free(data_ptr); 
