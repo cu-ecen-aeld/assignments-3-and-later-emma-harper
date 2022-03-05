@@ -5,10 +5,14 @@
 set -e
 set -u
 
+#cd into current path directory
+cd "$(dirname "$0")"
+
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
-username=$(cat conf/username.txt)
+username=$(cat /etc/finder-app/conf/username.txt)
+WRITE_OUT_PATH=/tmp/assignment-4-result.txt
 
 if [ $# -lt 2 ]
 then
@@ -47,10 +51,11 @@ fi
 
 for i in $( seq 1 $NUMFILES)
 do
-	./writer.sh "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
 OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+./writer "${WRITE_OUT_PATH}" "$OUTPUTSTRING"
 
 set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
