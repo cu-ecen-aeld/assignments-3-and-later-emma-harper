@@ -1,15 +1,32 @@
-CC = $(CROSS_COMPILE)gcc
-CFLAGS = -g -Wall -Werror
-SRCS := aesdsocket.c 
-TARGET = aesdsocket
-OBJS := $(SRC:.c=.o)
 
-all: $(TARGET)
+ifeq ($(CC),)
+	CC= $(CROSS_COMPILE)gcc
+endif
 
-writer: 
-	$(CC) $(CFLAGS) -c $(SRCS) -o $(TARGET).o 
-	$(CC) $(CFLAGS) $(TARGET).o -o $(TARGET)
+ifeq ($(CFLAGS),)
+	CFLAGS= -g -Wall -Werror -pthread
+endif
 
+ifeq ($(LDFLAGS),)
+	LDFLAGS = -lpthread -lrt	
+endif
+
+TARGET=aesdsocket
+
+CFILES= aesdsocket.c
+
+SRCS= ${CFILES}
+OBJS= ${CFILES:.c=.o}
+
+
+default: ${TARGET}
+
+all: ${TARGET}
+
+
+$(TARGET): $(SRCS) 
+	$(CC) $(CFLAGS) $^ -o $@ $(INCLUDES) $(LDFLAGS)
 
 clean:
-	-rm -f *.o $(TARGET)
+	-rm -f *.o
+	-rm -f ${TARGET} 
