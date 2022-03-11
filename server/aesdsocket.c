@@ -27,7 +27,14 @@
 #include <sys/time.h>
 #include <poll.h>
 
+#define USE_AESD_CHAR_DEVICE 1
+
+#ifdef USE_AESD_CHAR_DEVICE
+#define DATA_FILE "/dev/aesdchar"
+#else
 #define DATA_FILE "/var/tmp/aesdsocketdata"
+#endif
+
 #define MAX_NUM_CONNECTIONS 10
 #define BUF_SIZE 1024
 #define PORT_NUM "9000"
@@ -79,6 +86,8 @@ static void sig_handler(int sig){
     sig_caught = true;
 
 }
+
+#ifndef USE_AESD_CHAR_DEVICE
 
 
 static uint32_t TIMER_INTERVAL_SEC = 10;
@@ -152,10 +161,9 @@ void *handle_timer(void *args)
   pthread_exit(NULL);
 }
 
-
+#endif
 
 int main(int argc, char **argv) {
-
     openlog("aesdsocket", 0, LOG_USER);
     
     sig_t res = signal(SIGINT, sig_handler);
@@ -185,14 +193,15 @@ int main(int argc, char **argv) {
         }
     }
     //open or create file
-    int write_fd = creat(DATA_FILE, 0766);
+    int write_fd = open(DATA_FILE, O_CREAT | O_RDWR | O_TRUNC, 0666);
     if(write_fd < 0){
+        printf("error %d\n", errno);
         syslog(LOG_ERR, "ERROR: aesdsocketdata file could not be opened/created, error number %d", errno);
         shutdown_process();
         exit(1);
     }
     close(write_fd);
-  
+
     slist_data_t *data_ptr = NULL;
     SLIST_HEAD(slisthead, slist_data_s) head;
     SLIST_INIT(&head);
@@ -200,6 +209,7 @@ int main(int argc, char **argv) {
     struct addrinfo addr_hints;
 
     memset(&addr_hints, 0, sizeof(addr_hints));
+    printf("Here\n");
 
     //setup addr info
     addr_hints.ai_family = AF_INET;
@@ -229,9 +239,12 @@ int main(int argc, char **argv) {
         shutdown_process();
         exit(1);
     }
+        printf("Here\n");
 
     // Bind device address to socket
     if (bind(server_fd, new_addr_info->ai_addr, new_addr_info->ai_addrlen) < 0) {
+        printf("ERROR binding socket error num %d\n", errno);
+
         syslog(LOG_ERR, "ERROR binding socket error num %d\n", errno);
         freeaddrinfo(new_addr_info);
         shutdown_process();
@@ -239,7 +252,7 @@ int main(int argc, char **argv) {
     }
 
     freeaddrinfo(new_addr_info);
-    
+
     // Listen for connection
     if (listen(server_fd, MAX_NUM_CONNECTIONS)) {
         syslog(LOG_ERR, "ERROR: listening for connection error num %d\n", errno);
@@ -281,11 +294,14 @@ int main(int argc, char **argv) {
     }
 
     //timer_t timer_id;
+#ifndef USE_AESD_CHAR_DEVICE
 
      //   init_timer(&timer_id);
     int dummy_var = 1; 
     pthread_t time_id; 
     pthread_create(&time_id, NULL, handle_timer, (void*)&dummy_var);
+
+#endif 
 
     struct pollfd poll_socket[1];
     poll_socket[0].fd = server_fd;
@@ -348,7 +364,11 @@ int main(int argc, char **argv) {
 
     }
 
+#ifndef USE_AESD_CHAR_DEVICE
+
     pthread_join(time_id, NULL);
+
+#endif
 
     //Kill all threads
     while (!SLIST_EMPTY(&head)) {
@@ -360,8 +380,6 @@ int main(int argc, char **argv) {
         free(data_ptr); 
         data_ptr = NULL;// Free allocate memory
     }
-
-    printf("HERERERER\n\r");
     
     //close(data_fd);
     unlink(DATA_FILE);
@@ -375,9 +393,8 @@ int main(int argc, char **argv) {
 }
 
 void* run_socket_comm(void* thr_params){
+    printf("Here\n");
 
-
-    char buf[BUF_SIZE];
 
     client_thread_params* params = (client_thread_params*)thr_params;
 
@@ -391,11 +408,12 @@ void* run_socket_comm(void* thr_params){
 
     }
 
+    uint32_t counter = 1; 
     int curr_pos = 0;
-    uint32_t buf_space = BUF_SIZE;
+  //  uint32_t buf_space = BUF_SIZE;
     while(!(params->done_flag)){
 
-        int read_bytes = read(params->client_fd, buf, (BUF_SIZE));
+        int read_bytes = read(params->client_fd, thread_buf + curr_pos, BUF_SIZE);
         if (read_bytes < 0) {
             syslog(LOG_ERR, "Error: reading from socket errno=%d\n", errno);
             free(thread_buf);
@@ -408,28 +426,24 @@ void* run_socket_comm(void* thr_params){
         if (read_bytes == 0)
             continue; // no bytes to read
 
-        if(read_bytes > (buf_space)){
-            thread_buf = (char*)realloc(thread_buf, sizeof(char) * (curr_pos + BUF_SIZE));
+        curr_pos += read_bytes;
+
+        if (strchr(thread_buf, '\n')) {  //check if at end of file line
+           break; // break out of while 1
+
+        } 
+            counter++;
+            thread_buf = (char*)realloc(thread_buf, (counter * BUF_SIZE));
             if(thread_buf == NULL){
+                printf("size error is %d\n\r", (curr_pos + BUF_SIZE));
                 syslog(LOG_ERR,"Error allocating buffer for thread %d\n\r", (int)params->thread_id);
                 free(thread_buf);
                 params->done_flag = true; //exit
                 pthread_exit(NULL);
             }
 
-            buf_space += curr_pos;
 
-        }
 
-        memcpy(&thread_buf[curr_pos], buf, read_bytes);
-
-        curr_pos += read_bytes;
-        buf_space -= read_bytes;
-
-        if (strchr(buf, '\n')) {  //check if at end of file line
-           break; // break out of while 1
-
-        } 
 
     }
 
@@ -475,25 +489,32 @@ void* run_socket_comm(void* thr_params){
 
    // printf("buff val is %x\n",(uint8_t)buf[curr_pos]);
 
-    memset(buf,0, BUF_SIZE);
+    printf("Here\n");
 
     
     int read_offset = 0;
 
+    int fd_send = open(DATA_FILE, O_RDWR | O_APPEND, 0766);
+    if(fd_send < 0){
+        syslog(LOG_ERR, "Error: reading from socket errno=%d\n", errno);
+        printf("error is %d\n\r", errno);
+        free(thread_buf); //free mem
+        params->done_flag = true;
+        pthread_exit(NULL);    
+    }
+
+    lseek(fd_send, read_offset, SEEK_SET);
+
+
+
+    char* buf = (char*)malloc(sizeof(char) * BUF_SIZE);
+    curr_pos = 0;
+    memset(buf,0, BUF_SIZE);
+    counter = 1; 
     while(1) {
 
-        int fd = open(DATA_FILE, O_RDWR | O_APPEND, 0766);
-        if(fd < 0){
-            syslog(LOG_ERR, "Error: reading from socket errno=%d\n", errno);
-            printf("error is %d\n\r", errno);
-            curr_pos = 0; //re read
-            continue; 
-        }
 
-        lseek(fd, read_offset, SEEK_SET);
-
-
-        int ret = pthread_mutex_lock(params->mutex);
+        ret = pthread_mutex_lock(params->mutex);
         if(ret){
             syslog(LOG_ERR, "Mutex cannot be locked\n\r");
             printf("Mutex cannot be locked\n\r");
@@ -501,42 +522,66 @@ void* run_socket_comm(void* thr_params){
             params->done_flag = true;
             pthread_exit(NULL);
         }
-        
-        int read_bytes = read(fd, buf, BUF_SIZE);
+
+        int read_bytes = read(fd_send, &buf[curr_pos], 1);
 
         ret = pthread_mutex_unlock(params->mutex);   
         if(ret){
             syslog(LOG_ERR, "Mutex cannot be locked\n\r");
             printf("Mutex cannot be locked\n\r");
             free(thread_buf); //free mem
+            free(buf);
             params->done_flag = true;
             pthread_exit(NULL);
         }
-        
-        close(fd);
+
         if(read_bytes < 0){
             syslog(LOG_ERR, "Error reading from file errno %d\n", errno);
-            continue;
+            break;
         }
 
         if(read_bytes == 0)
             break;
 
-        //write to socket
-        int write_bytes = write(params->client_fd, buf, read_bytes );
-        printf("wrote %d bytes to client\n\r", write_bytes);
+        if(buf[curr_pos] == '\n'){
+            //write to socket
+            int write_bytes = write(params->client_fd, buf, curr_pos + 1 );
+            printf("wrote %d bytes to client\n\r", write_bytes);
 
-        if(write_bytes < 0){
-            printf("errno is %d", errno);
+            if(write_bytes < 0){
+                printf("errno is %d", errno);
+                syslog(LOG_ERR, "Error writing to client fd %d\n", errno);
+                break;
+            }
+            memset(buf, 0, (curr_pos + 1));
 
-            syslog(LOG_ERR, "Error writing to client fd %d\n", errno);
-            continue;
+            curr_pos = 0;
+
+        } else {
+            curr_pos++;
+            if(curr_pos > sizeof(buf)){
+                counter++;
+                buf = realloc(buf, counter * BUF_SIZE);
+                if(buf == NULL){
+                    printf("size error is %d\n\r", (curr_pos + BUF_SIZE));
+                    syslog(LOG_ERR,"Error allocating buffer for thread %d\n\r", (int)params->thread_id);
+                    free(buf);
+                    free(thread_buf);
+                    params->done_flag = true; //exit
+                    pthread_exit(NULL);
+                }
+            }   
+
+        
+
         }
 
-        read_offset += write_bytes;
 
     }
 
+    
+    close(fd_send);
+    free(buf);
     free(thread_buf);
     params->done_flag = true;
     pthread_exit(NULL);
