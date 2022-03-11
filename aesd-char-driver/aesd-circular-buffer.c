@@ -99,3 +99,22 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer) {
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
+
+void aesd_circular_buffer_deallocate(struct aesd_circular_buffer *buffer) {
+    struct aesd_circular_buffer *buf = buffer;
+    struct aesd_buffer_entry *entry;
+    uint8_t index;
+
+    AESD_CIRCULAR_BUFFER_FOREACH(entry,buf,index) 
+    {
+        if(entry->buffptr != NULL)
+        {
+            #ifdef __KERNEL__
+                kfree(entry->buffptr);
+            #else
+                free((void*)entry->buffptr);    
+            #endif
+        }
+        
+    }
+}
