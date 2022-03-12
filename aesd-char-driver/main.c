@@ -18,6 +18,10 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
+#include <linux/uaccess.h> 
+#include <linux/string.h>
+#include <linux/slab.h> 
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -32,8 +36,8 @@ int aesd_open(struct inode *inode, struct file *filp)
 	/**
 	 * TODO: handle open
 	 */
-	struct aesd_dev* ch_dev_ptr;
-	ch_dev_ptr = container_of(inote->cdev, struct aesd_dev, cdev);
+	struct aesd_dev* ch_dev_ptr = NULL;
+	ch_dev_ptr = container_of(inode->i_cdev, struct aesd_dev, cdev);
 	filp->private_data = ch_dev_ptr;
 
 	return 0;
@@ -79,6 +83,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	
 	if(total_avail_bytes > count)
 		bytes_read = count;
+	else 
+		bytes_read = total_avail_bytes;
 
 	int ret = copy_to_user(buf, circ_buf_entry->buffptr + entry_offset_byte, bytes_read);
 
@@ -88,7 +94,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 	}
 	return_val = bytes_read;
 
-	*f_pos += read_bytes;
+	*f_pos += bytes_read;
 
 	done:
 		mutex_unlock(&dev->lock);
@@ -106,13 +112,14 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	 * TODO: handle write
 	 */
 	struct aesd_dev* device = filp->private_data;
+	const char* new_entry = NULL;
 
 	if(mutex_lock_interruptible(&device->lock)){
 		retval = -ERESTARTSYS;
 		return retval;
 	}
 	if(device->write_entry.size == 0)
-		device->write_entry.buffptr = kzalloc(count, GEP_KERNEL);
+		device->write_entry.buffptr = kzalloc(count, GFP_KERNEL);
 	else 
 		device->write_entry.buffptr = krealloc(device->write_entry.buffptr, 
 												device->write_entry.size + count, GFP_KERNEL);
@@ -132,12 +139,11 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
 	device->write_entry.size += retval; //count - error_nytes num 
 
-	const 
 	if(strchr((char*)(device->write_entry.buffptr), '\n')){
-		const char* new_entry = aesd_circular_buffer_add_entry(&device->buffer, &device->write_entry);
-
-		kfree(new_entry);
-		device->write_entry.buffptr = 0;
+		new_entry = aesd_circular_buffer_add_entry(&device->buffer, &device->write_entry);
+		if(new_entry)
+			kfree(new_entry);
+		device->write_entry.buffptr = NULL;
 		device->write_entry.size = 0; 
 	}
 
